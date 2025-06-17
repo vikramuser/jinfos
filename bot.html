@@ -133,40 +133,52 @@
     <button id="sendBtn">Send</button>
   </div>
 
-  <script>
-    const chatbox = document.getElementById("chatbox");
-    const userInput = document.getElementById("userInput");
-    const sendBtn = document.getElementById("sendBtn");
+ <script>
+  const chatbox = document.getElementById("chatbox");
+  const userInput = document.getElementById("userInput");
+  const sendBtn = document.getElementById("sendBtn");
 
-    function addMessage(text, sender) {
-      const msg = document.createElement("div");
-      msg.className = "message " + sender;
-      msg.textContent = text;
-      chatbox.appendChild(msg);
-      chatbox.scrollTop = chatbox.scrollHeight;
-    }
+  function addMessage(text, sender) {
+    const msg = document.createElement("div");
+    msg.className = "message " + sender;
+    msg.textContent = text;
+    chatbox.appendChild(msg);
+    chatbox.scrollTop = chatbox.scrollHeight;
+  }
 
-    async function getDuckAnswer(query) {
-      const url = `https://api.duckduckgo.com/?q=${encodeURIComponent(query)}&format=json&no_html=1&skip_disambig=1`;
+  async function getDuckAnswer(query) {
+    const url = `https://api.duckduckgo.com/?q=${encodeURIComponent(query)}&format=json&no_html=1&skip_disambig=0`;
+    try {
       const res = await fetch(url);
       const data = await res.json();
-      return data.Abstract || "Sorry, I couldn't find an answer.";
+
+      if (data.Abstract) return data.Abstract;
+      if (data.Answer) return data.Answer;
+      if (data.RelatedTopics && data.RelatedTopics.length > 0) {
+        return data.RelatedTopics[0].Text || "Here's something related I found.";
+      }
+
+      return "Sorry, I couldn't find an answer.";
+    } catch (error) {
+      return "Failed to fetch data. Please try again later.";
     }
+  }
 
-    async function handleSend() {
-      const text = userInput.value.trim();
-      if (!text) return;
-      addMessage(text, "user");
-      userInput.value = "";
+  async function handleSend() {
+    const text = userInput.value.trim();
+    if (!text) return;
+    addMessage(text, "user");
+    userInput.value = "";
 
-      const answer = await getDuckAnswer(text);
-      addMessage(answer, "bot");
-    }
+    const answer = await getDuckAnswer(text);
+    addMessage(answer, "bot");
+  }
 
-    sendBtn.addEventListener("click", handleSend);
-    userInput.addEventListener("keydown", (e) => {
-      if (e.key === "Enter") handleSend();
-    });
-  </script>
+  sendBtn.addEventListener("click", handleSend);
+  userInput.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") handleSend();
+  });
+</script>
+
 </body>
 </html>
