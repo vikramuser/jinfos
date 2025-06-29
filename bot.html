@@ -19,11 +19,6 @@
       flex-direction: column;
     }
 
-    body {
-      display: flex;
-      flex-direction: column;
-    }
-
     header {
       background-color: #e60023;
       color: white;
@@ -77,6 +72,7 @@
       margin: 0 auto;
       background: white;
       border-top: 2px solid #e60023;
+      align-items: center;
     }
 
     #userInput {
@@ -99,24 +95,30 @@
     }
 
     @media (max-width: 600px) {
-      header {
-        font-size: 18px;
+      #inputArea {
+        flex-direction: row-reverse;
+        gap: 8px;
+        flex-wrap: wrap;
         padding: 8px;
+      }
+
+      #sendBtn {
+        margin-left: 0;
+        margin-right: 0;
+        width: auto;
+      }
+
+      #userInput {
+        flex: 1;
       }
 
       .message {
         font-size: 14px;
       }
 
-      #inputArea {
-        flex-direction: column;
+      header {
+        font-size: 18px;
         padding: 8px;
-        gap: 8px;
-      }
-
-      #sendBtn {
-        width: 100%;
-        margin-left: 0;
       }
     }
   </style>
@@ -169,7 +171,7 @@
         return data.choices[0].message.content.trim();
       } catch (err) {
         console.error(err);
-        return "Error: Could not connect to server.";
+        return "❌ Error: Could not connect to Mistral.";
       }
     }
 
