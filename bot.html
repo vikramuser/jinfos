@@ -178,7 +178,7 @@
         return data.choices[0].message.content.trim();
       } catch (err) {
         console.error(err);
-        return "❌ Error: Could not connect to Mistral.";
+        return "Error: Could not connect to server.";
       }
     }
 
