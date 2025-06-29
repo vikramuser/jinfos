@@ -133,52 +133,82 @@
     <button id="sendBtn">Send</button>
   </div>
 
- <script>
-  const chatbox = document.getElementById("chatbox");
-  const userInput = document.getElementById("userInput");
-  const sendBtn = document.getElementById("sendBtn");
+  <script>
+    const chatbox = document.getElementById("chatbox");
+    const userInput = document.getElementById("userInput");
+    const sendBtn = document.getElementById("sendBtn");
 
-  function addMessage(text, sender) {
-    const msg = document.createElement("div");
-    msg.className = "message " + sender;
-    msg.textContent = text;
-    chatbox.appendChild(msg);
-    chatbox.scrollTop = chatbox.scrollHeight;
-  }
+    const API_KEY = "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";
+    const MODEL_ID = "deepseek/deepseek-r1-0528-qwen3-8b:free";
 
-  async function getDuckAnswer(query) {
-    const url = `https://api.duckduckgo.com/?q=${encodeURIComponent(query)}&format=json&no_html=1&skip_disambig=0`;
-    try {
-      const res = await fetch(url);
-      const data = await res.json();
-
-      if (data.Abstract) return data.Abstract;
-      if (data.Answer) return data.Answer;
-      if (data.RelatedTopics && data.RelatedTopics.length > 0) {
-        return data.RelatedTopics[0].Text || "Here's something related I found.";
-      }
-
-      return "Sorry, I couldn't find an answer.";
-    } catch (error) {
-      return "Failed to fetch data. Please try again later.";
+    function addMessage(text, sender) {
+      const msg = document.createElement("div");
+      msg.className = "message " + sender;
+      msg.textContent = text;
+      chatbox.appendChild(msg);
+      chatbox.scrollTop = chatbox.scrollHeight;
     }
-  }
 
-  async function handleSend() {
-    const text = userInput.value.trim();
-    if (!text) return;
-    addMessage(text, "user");
-    userInput.value = "";
+    // Remove self-reference like “I'm DeepSeek…”
+    function cleanBotReply(text) {
+      return text
+        .replace(/I'm (DeepSeek|an AI|your AI assistant)[^.!?\n]*[.!?\n]?/gi, '')
+        .replace(/(?:My name is|I am called)[^.!?\n]*[.!?\n]?/gi, '')
+        .trim();
+    }
 
-    const answer = await getDuckAnswer(text);
-    addMessage(answer, "bot");
-  }
+    async function getAIResponse(query) {
+      try {
+        const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${API_KEY}`,
+            "HTTP-Referer": "https://example.com",
+            "X-Title": "DuckBot Chat"
+          },
+          body: JSON.stringify({
+            model: MODEL_ID,
+            messages: [
+              {
+                role: "system",
+                content: "You are a helpful assistant. Do not talk about yourself or your creators. Only provide clear and useful responses to the user."
+              },
+              { role: "user", content: query }
+            ],
+            max_tokens: 500
+          })
+        });
 
-  sendBtn.addEventListener("click", handleSend);
-  userInput.addEventListener("keydown", (e) => {
-    if (e.key === "Enter") handleSend();
-  });
-</script>
+        const data = await res.json();
+        if (data.choices?.[0]?.message?.content) {
+          return cleanBotReply(data.choices[0].message.content.trim());
+        } else if (data.error?.message) {
+          return `Error: ${data.error.message}`;
+        } else {
+          return "No response from the model.";
+        }
+      } catch (error) {
+        console.error("API Error:", error);
+        return "Something went wrong while connecting to the model.";
+      }
+    }
+
+    async function handleSend() {
+      const text = userInput.value.trim();
+      if (!text) return;
+      addMessage(text, "user");
+      userInput.value = "";
+
+      const reply = await getAIResponse(text);
+      addMessage(reply, "bot");
+    }
+
+    sendBtn.addEventListener("click", handleSend);
+    userInput.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") handleSend();
+    });
+  </script>
 
 </body>
 </html>
