@@ -39,12 +39,12 @@
 
     .message {
       margin: 8px;
-      padding: 10px 14px;
+      padding: 12px 16px;
       border-radius: 20px;
-      max-width: 80%;
+      max-width: 85%;
       word-wrap: break-word;
       font-size: 15px;
-      line-height: 1.4;
+      line-height: 1.5;
     }
 
     .user {
@@ -63,10 +63,34 @@
 
     .bot strong {
       font-weight: bold;
+      color: #fff;
     }
 
     .bot em {
       font-style: italic;
+      color: #ffeeee;
+    }
+
+    .bot code {
+      background-color: rgba(255,255,255,0.2) !important;
+      color: #fff !important;
+      border-radius: 3px;
+      padding: 2px 4px;
+    }
+
+    .bot pre {
+      background-color: rgba(255,255,255,0.1) !important;
+      border: 1px solid rgba(255,255,255,0.2);
+      border-radius: 8px;
+      padding: 12px;
+      margin: 8px 0;
+      overflow-x: auto;
+    }
+
+    .bot pre code {
+      background-color: transparent !important;
+      color: #fff !important;
+      font-family: 'Consolas', 'Monaco', monospace;
     }
 
     .typing-indicator {
