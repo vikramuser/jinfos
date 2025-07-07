@@ -44,6 +44,7 @@
       max-width: 80%;
       word-wrap: break-word;
       font-size: 15px;
+      line-height: 1.4;
     }
 
     .user {
@@ -58,6 +59,53 @@
       background-color: #e60023;
       color: white;
       margin-right: auto;
+    }
+
+    .bot strong {
+      font-weight: bold;
+    }
+
+    .bot em {
+      font-style: italic;
+    }
+
+    .typing-indicator {
+      display: flex;
+      align-items: center;
+      background-color: #f0f0f0;
+      color: #666;
+      padding: 10px 14px;
+      border-radius: 20px;
+      margin: 8px;
+      margin-right: auto;
+      max-width: 80%;
+    }
+
+    .typing-dots {
+      display: flex;
+      gap: 3px;
+      margin-left: 5px;
+    }
+
+    .typing-dots span {
+      width: 6px;
+      height: 6px;
+      background-color: #666;
+      border-radius: 50%;
+      animation: typing 1.4s infinite;
+    }
+
+    .typing-dots span:nth-child(2) {
+      animation-delay: 0.2s;
+    }
+
+    .typing-dots span:nth-child(3) {
+      animation-delay: 0.4s;
+    }
+
+    @keyframes typing {
+      0%, 60%, 100% { opacity: 0.3; }
+      30% { opacity: 1; }
     }
 
     #inputArea {
@@ -77,6 +125,9 @@
       border: 1px solid #e60023;
       border-radius: 20px;
       outline: none;
+      resize: none;
+      min-height: 40px;
+      max-height: 120px;
     }
 
     #sendBtn {
@@ -88,6 +139,16 @@
       border-radius: 20px;
       cursor: pointer;
       margin-left: 10px;
+      transition: background-color 0.2s;
+    }
+
+    #sendBtn:hover {
+      background-color: #d0001e;
+    }
+
+    #sendBtn:disabled {
+      background-color: #ccc;
+      cursor: not-allowed;
     }
 
     @media (max-width: 600px) {
@@ -115,34 +176,115 @@
   <div id="chatbox"></div>
 
   <div id="inputArea">
-    <input type="text" id="userInput" placeholder="Ask something..." />
+    <textarea id="userInput" placeholder="Ask something..." rows="1"></textarea>
     <button id="sendBtn">Send</button>
   </div>
 
   <script>
     const API_KEY = "Ouw0VGit3x7D7oXeCQRCUSbenDJwoONc";
     const API_URL = "https://api.mistral.ai/v1/chat/completions";
-    const MODEL = "mistral-small-latest";
+    const MODEL = "mistral-large-latest"; // Using the more capable model
 
     const chatbox = document.getElementById("chatbox");
     const userInput = document.getElementById("userInput");
     const sendBtn = document.getElementById("sendBtn");
+    
+    let conversationHistory = [];
+
+    // Auto-resize textarea
+    userInput.addEventListener('input', function() {
+      this.style.height = 'auto';
+      this.style.height = Math.min(this.scrollHeight, 120) + 'px';
+    });
 
     function addMessage(text, sender) {
       const msg = document.createElement("div");
       msg.className = "message " + sender;
-      msg.textContent = text;
+      
+      if (sender === 'bot') {
+        msg.innerHTML = formatMessage(text);
+      } else {
+        msg.textContent = text;
+      }
+      
       chatbox.appendChild(msg);
       chatbox.scrollTop = chatbox.scrollHeight;
     }
 
+    function formatMessage(text) {
+      // Enhanced formatting for better readability
+      return text
+        .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+        .replace(/\*(.*?)\*/g, '<em>$1</em>')
+        .replace(/```(.*?)```/gs, '<pre style="background:#f5f5f5;padding:8px;border-radius:4px;margin:4px 0;"><code>$1</code></pre>')
+        .replace(/`(.*?)`/g, '<code style="background:#f5f5f5;padding:2px 4px;border-radius:2px;">$1</code>')
+        .replace(/\n\n/g, '<br><br>')
+        .replace(/\n/g, '<br>')
+        .replace(/(\d+\.)\s/g, '<br>$1 ')
+        .replace(/^(\s*)-\s/gm, '<br>• ');
+    }
+
+    function showTypingIndicator() {
+      const typingDiv = document.createElement("div");
+      typingDiv.className = "typing-indicator";
+      typingDiv.id = "typing-indicator";
+      typingDiv.innerHTML = `
+        AI is thinking
+        <div class="typing-dots">
+          <span></span>
+          <span></span>
+          <span></span>
+        </div>
+      `;
+      chatbox.appendChild(typingDiv);
+      chatbox.scrollTop = chatbox.scrollHeight;
+    }
+
+    function hideTypingIndicator() {
+      const typingIndicator = document.getElementById("typing-indicator");
+      if (typingIndicator) {
+        typingIndicator.remove();
+      }
+    }
+
     async function getMistralReply(question) {
+      // Add user message to conversation history
+      conversationHistory.push({ role: "user", content: question });
+      
+      // Keep only last 10 messages to manage context length
+      if (conversationHistory.length > 10) {
+        conversationHistory = conversationHistory.slice(-10);
+      }
+
       const payload = {
         model: MODEL,
         messages: [
-          { role: "system", content: "You are a helpful assistant. Keep replies short and avoid self-reference." },
-          { role: "user", content: question }
-        ]
+          {
+            role: "system",
+            content: `You are a highly knowledgeable and professional AI assistant. Your responses should be:
+
+            - Comprehensive and well-structured with clear explanations
+            - Professional in tone while remaining friendly and approachable
+            - Detailed with relevant examples when helpful
+            - Well-organized with proper formatting (use **bold** for emphasis, *italics* for subtle emphasis)
+            - Thoughtful and insightful, demonstrating expertise
+            - Include step-by-step guidance when appropriate
+            - Use bullet points or numbered lists for clarity when needed
+            - Provide practical, actionable advice
+            - Be thorough but concise - avoid unnecessary verbosity
+            - Use code blocks (\`\`\`) for code examples
+            - Break down complex topics into digestible parts
+            
+            Always aim to give thorough, helpful responses that add real value and demonstrate deep understanding of the subject matter.`
+          },
+          ...conversationHistory
+        ],
+        max_tokens: 3000, // Increased for longer, more detailed responses
+        temperature: 0.7, // Balanced creativity and consistency
+        top_p: 0.9, // High-quality token selection
+        presence_penalty: 0.1, // Encourage diverse vocabulary
+        frequency_penalty: 0.1, // Reduce repetition
+        stream: false
       };
 
       try {
@@ -155,11 +297,24 @@
           body: JSON.stringify(payload)
         });
 
+        if (!res.ok) {
+          const errorText = await res.text();
+          throw new Error(`HTTP ${res.status}: ${errorText}`);
+        }
+
         const data = await res.json();
-        return data.choices[0].message.content.trim();
+        
+        if (data.choices && data.choices[0] && data.choices[0].message) {
+          const reply = data.choices[0].message.content.trim();
+          // Add AI response to conversation history
+          conversationHistory.push({ role: "assistant", content: reply });
+          return reply;
+        } else {
+          throw new Error("Invalid response format from API");
+        }
       } catch (err) {
-        console.error(err);
-        return "Error: Could not connect to server.";
+        console.error("API Error:", err);
+        return "I apologize, but I'm experiencing technical difficulties at the moment. Please try again in a few seconds, or rephrase your question.";
       }
     }
 
@@ -167,17 +322,53 @@
       const text = userInput.value.trim();
       if (!text) return;
 
+      // Disable input while processing
+      userInput.disabled = true;
+      sendBtn.disabled = true;
+      sendBtn.textContent = "Sending...";
+
       addMessage(text, "user");
       userInput.value = "";
+      userInput.style.height = 'auto';
 
-      const reply = await getMistralReply(text);
-      addMessage(reply, "bot");
+      showTypingIndicator();
+
+      try {
+        const reply = await getMistralReply(text);
+        hideTypingIndicator();
+        addMessage(reply, "bot");
+      } catch (error) {
+        hideTypingIndicator();
+        addMessage("I apologize for the inconvenience. There was an error processing your request. Please try again.", "bot");
+        console.error("Error in handleSend:", error);
+      } finally {
+        // Re-enable input
+        userInput.disabled = false;
+        sendBtn.disabled = false;
+        sendBtn.textContent = "Send";
+        userInput.focus();
+      }
     }
 
+    // Event listeners
     sendBtn.addEventListener("click", handleSend);
+    
     userInput.addEventListener("keydown", e => {
-      if (e.key === "Enter") handleSend();
+      if (e.key === "Enter" && !e.shiftKey) {
+        e.preventDefault();
+        handleSend();
+      }
     });
+
+    // Auto-focus on input when page loads
+    document.addEventListener("DOMContentLoaded", () => {
+      userInput.focus();
+    });
+
+    // Add a welcome message
+    setTimeout(() => {
+      addMessage("Hello! I'm your AI assistant. I'm here to provide detailed, professional responses to your questions. Feel free to ask me anything!", "bot");
+    }, 500);
   </script>
 </body>
 </html>
