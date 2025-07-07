@@ -78,21 +78,6 @@
       padding: 2px 4px;
     }
 
-    .bot pre {
-      background-color: rgba(255,255,255,0.1) !important;
-      border: 1px solid rgba(255,255,255,0.2);
-      border-radius: 8px;
-      padding: 12px;
-      margin: 8px 0;
-      overflow-x: auto;
-    }
-
-    .bot pre code {
-      background-color: transparent !important;
-      color: #fff !important;
-      font-family: 'Consolas', 'Monaco', monospace;
-    }
-
     .typing-indicator {
       display: flex;
       align-items: center;
@@ -207,7 +192,7 @@
   <script>
     const API_KEY = "Ouw0VGit3x7D7oXeCQRCUSbenDJwoONc";
     const API_URL = "https://api.mistral.ai/v1/chat/completions";
-    const MODEL = "mistral-large-latest"; // Using the more capable model
+    const MODEL = "mistral-small-latest"; // Fastest model
 
     const chatbox = document.getElementById("chatbox");
     const userInput = document.getElementById("userInput");
@@ -236,16 +221,12 @@
     }
 
     function formatMessage(text) {
-      // Enhanced formatting for better readability
+      // Minimal formatting for speed
       return text
         .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
         .replace(/\*(.*?)\*/g, '<em>$1</em>')
-        .replace(/```(.*?)```/gs, '<pre style="background:#f5f5f5;padding:8px;border-radius:4px;margin:4px 0;"><code>$1</code></pre>')
-        .replace(/`(.*?)`/g, '<code style="background:#f5f5f5;padding:2px 4px;border-radius:2px;">$1</code>')
-        .replace(/\n\n/g, '<br><br>')
-        .replace(/\n/g, '<br>')
-        .replace(/(\d+\.)\s/g, '<br>$1 ')
-        .replace(/^(\s*)-\s/gm, '<br>• ');
+        .replace(/`(.*?)`/g, '<code>$1</code>')
+        .replace(/\n/g, '<br>');
     }
 
     function showTypingIndicator() {
@@ -272,73 +253,68 @@
     }
 
     async function getMistralReply(question) {
-      // Add user message to conversation history
-      conversationHistory.push({ role: "user", content: question });
+      // Minimal context - only last 2 messages for speed
+      const recentHistory = conversationHistory.slice(-2);
       
-      // Keep only last 10 messages to manage context length
-      if (conversationHistory.length > 10) {
-        conversationHistory = conversationHistory.slice(-10);
-      }
-
       const payload = {
         model: MODEL,
         messages: [
           {
             role: "system",
-            content: `You are a highly knowledgeable and professional AI assistant. Your responses should be:
-
-            - Comprehensive and well-structured with clear explanations
-            - Professional in tone while remaining friendly and approachable
-            - Detailed with relevant examples when helpful
-            - Well-organized with proper formatting (use **bold** for emphasis, *italics* for subtle emphasis)
-            - Thoughtful and insightful, demonstrating expertise
-            - Include step-by-step guidance when appropriate
-            - Use bullet points or numbered lists for clarity when needed
-            - Provide practical, actionable advice
-            - Be thorough but concise - avoid unnecessary verbosity
-            - Use code blocks (\`\`\`) for code examples
-            - Break down complex topics into digestible parts
-            
-            Always aim to give thorough, helpful responses that add real value and demonstrate deep understanding of the subject matter.`
+            content: "You are a helpful AI assistant. Provide clear, concise responses."
           },
-          ...conversationHistory
+          ...recentHistory,
+          { role: "user", content: question }
         ],
-        max_tokens: 3000, // Increased for longer, more detailed responses
-        temperature: 0.7, // Balanced creativity and consistency
-        top_p: 0.9, // High-quality token selection
-        presence_penalty: 0.1, // Encourage diverse vocabulary
-        frequency_penalty: 0.1, // Reduce repetition
+        max_tokens: 800, // Reduced for faster responses
+        temperature: 0.3, // Lower for consistency and speed
+        top_p: 0.8, // Reduced for faster generation
         stream: false
       };
 
       try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 30000); // 30s timeout
+        
         const res = await fetch(API_URL, {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
             "Authorization": `Bearer ${API_KEY}`
           },
-          body: JSON.stringify(payload)
+          body: JSON.stringify(payload),
+          signal: controller.signal
         });
 
+        clearTimeout(timeoutId);
+
         if (!res.ok) {
-          const errorText = await res.text();
-          throw new Error(`HTTP ${res.status}: ${errorText}`);
+          throw new Error(`HTTP ${res.status}`);
         }
 
         const data = await res.json();
         
-        if (data.choices && data.choices[0] && data.choices[0].message) {
+        if (data.choices?.[0]?.message?.content) {
           const reply = data.choices[0].message.content.trim();
-          // Add AI response to conversation history
-          conversationHistory.push({ role: "assistant", content: reply });
+          
+          // Update conversation history efficiently
+          conversationHistory.push(
+            { role: "user", content: question },
+            { role: "assistant", content: reply }
+          );
+          
+          // Keep only last 4 messages for speed
+          if (conversationHistory.length > 4) {
+            conversationHistory = conversationHistory.slice(-4);
+          }
+          
           return reply;
         } else {
-          throw new Error("Invalid response format from API");
+          throw new Error("Invalid response");
         }
       } catch (err) {
         console.error("API Error:", err);
-        return "I apologize, but I'm experiencing technical difficulties at the moment. Please try again in a few seconds, or rephrase your question.";
+        return "Sorry, I'm having trouble responding right now. Please try again.";
       }
     }
 
@@ -346,10 +322,10 @@
       const text = userInput.value.trim();
       if (!text) return;
 
-      // Disable input while processing
+      // Quick UI updates
       userInput.disabled = true;
       sendBtn.disabled = true;
-      sendBtn.textContent = "Sending...";
+      sendBtn.textContent = "...";
 
       addMessage(text, "user");
       userInput.value = "";
@@ -363,10 +339,8 @@
         addMessage(reply, "bot");
       } catch (error) {
         hideTypingIndicator();
-        addMessage("I apologize for the inconvenience. There was an error processing your request. Please try again.", "bot");
-        console.error("Error in handleSend:", error);
+        addMessage("Error occurred. Please try again.", "bot");
       } finally {
-        // Re-enable input
         userInput.disabled = false;
         sendBtn.disabled = false;
         sendBtn.textContent = "Send";
@@ -389,10 +363,10 @@
       userInput.focus();
     });
 
-    // Add a welcome message
+    // Quick welcome message
     setTimeout(() => {
-      addMessage("Hello! I'm your AI assistant. I'm here to provide detailed, professional responses to your questions. Feel free to ask me anything!", "bot");
-    }, 500);
+      addMessage("Hello! I'm your AI assistant. Ask me anything!", "bot");
+    }, 200);
   </script>
 </body>
 </html>
